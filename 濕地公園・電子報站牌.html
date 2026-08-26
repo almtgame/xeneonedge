@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- 設計方向：香港路邊 LED 到站牌；為 XENEON EDGE 32:9 橫向螢幕而設。 -->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>濕地公園・電子報站牌</title>
+<style>
+:root{--night:#08221d;--panel:#113c32;--line:#27594b;--amber:#ffb000;--paper:#f4f0e6;--muted:#9dbdae;--city:#4bb4e6;--mtr:#e7695c;--lwb:#ffbd3e;--ok:#82ddaa}
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden}body{font-family:"Noto Sans TC","Noto Sans CJK TC",system-ui,sans-serif;background:var(--night);color:var(--paper)}
+.sign{width:100vw;height:100vh;min-width:560px;padding:clamp(14px,2.4vh,26px) clamp(18px,2vw,48px);display:grid;grid-template-rows:auto 1fr auto;gap:clamp(8px,1.25vh,14px);background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 4px)}
+.header{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:16px;border-bottom:1px solid var(--line);padding-bottom:clamp(7px,1vh,11px)}
+.identity{display:flex;align-items:center;gap:13px;min-width:0}.signal{display:flex;gap:5px}.signal i{display:block;width:clamp(7px,.6vw,10px);height:clamp(7px,.6vw,10px);border-radius:50%;background:var(--amber);box-shadow:0 0 12px rgba(255,176,0,.6)}
+.title{font-size:clamp(17px,1.65vw,26px);font-weight:800;letter-spacing:.03em;white-space:nowrap}.station{font-size:clamp(10px,.85vw,14px);color:var(--muted);font-weight:600;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.clock{font-variant-numeric:tabular-nums;font-weight:700;font-size:clamp(16px,1.5vw,25px);color:var(--amber);letter-spacing:.07em}.refresh{appearance:none;border:1px solid var(--line);background:transparent;color:var(--paper);font:inherit;font-size:clamp(11px,.82vw,14px);padding:8px 12px;cursor:pointer;transition:.15s ease}.refresh:hover,.refresh:focus-visible{outline:none;border-color:var(--amber);color:var(--amber)}.refresh:disabled{opacity:.55;cursor:wait}
+.board{min-height:0;display:grid;grid-template-rows:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.row{position:relative;display:grid;grid-template-columns:clamp(80px,9.5vw,160px) minmax(160px,1.5fr) minmax(125px,.7fr) minmax(140px,.8fr);align-items:center;gap:clamp(9px,1.3vw,24px);padding:0 clamp(8px,1vw,18px);border-bottom:1px solid var(--line);background:linear-gradient(90deg,rgba(17,60,50,.86),rgba(17,60,50,.3));overflow:hidden}.row:last-child{border-bottom:0}.row::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--accent)}.route{font-size:clamp(25px,3.2vw,48px);font-weight:850;line-height:1;letter-spacing:-.045em;color:var(--paper)}.destination{font-size:clamp(13px,1.35vw,22px);font-weight:700;line-height:1.17;overflow-wrap:anywhere}.eta{color:var(--amber);font-size:clamp(21px,2.4vw,38px);font-weight:850;line-height:1;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.next{justify-self:end;text-align:right;font-size:clamp(10px,.98vw,16px);line-height:1.35;color:var(--muted)}.next strong{font-weight:750;color:var(--paper)}.row.empty .eta{font-size:clamp(13px,1.3vw,21px);color:var(--muted);white-space:normal}.row.error .eta{font-size:clamp(12px,1.2vw,19px);color:#e6b4a9;white-space:normal}
+.footer{display:flex;justify-content:space-between;gap:15px;align-items:center;color:var(--muted);font-size:clamp(10px,.84vw,13px);font-weight:600;letter-spacing:.04em}.footer b{color:var(--ok);font-weight:750}.feed{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:950px){.sign{min-width:0;padding:12px 16px;gap:7px}.header{grid-template-columns:1fr auto}.station{display:none}.refresh{padding:6px 9px}.board{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line)}.row{grid-template-columns:72px 1fr;grid-template-rows:1fr auto;padding:9px 10px;gap:3px 9px;border:0}.route{grid-row:1 / span 2;font-size:28px}.destination{font-size:12px;align-self:end}.eta{font-size:23px;align-self:start;text-align:left}.next{display:none}.footer{font-size:9px}.feed{max-width:68vw}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="sign" aria-label="濕地公園巴士到站電子報站牌">
+<header class="header"><div class="identity"><span class="signal" aria-hidden="true"><i></i><i></i><i></i></span><div><div class="title">濕地公園・下一班</div><div class="station">固定上車站：香港濕地公園／濕地公園路</div></div></div><time id="clock" class="clock">--:--:--</time><button id="refresh" class="refresh" type="button">更新資料</button></header>
+<section id="board" class="board" aria-live="polite"></section>
+<footer class="footer"><span id="feed" class="feed"><b>●</b> 準備讀取官方到站資料</span><span>每 60 秒同步・每秒倒數</span></footer>
+</main>
+<script>
+(() => {
+ const CONFIG={refreshMs:60000,services:[
+  {key:'e37',route:'E37',destination:'機場（地面運輸中心）',stop:'香港濕地公園（TN401）',accent:'var(--lwb)',url:'https://data.etabus.gov.hk/v1/transport/kmb/eta/0C080F70E16F02B7/E37/1',kind:'kmb'},
+  {key:'a37',route:'A37',destination:'機場（地面運輸中心）',stop:'香港濕地公園（TN401）',accent:'var(--lwb)',url:'https://data.etabus.gov.hk/v1/transport/kmb/eta/0C080F70E16F02B7/A37/1',kind:'kmb'},
+  {key:'967',route:'967',destination:'金鐘（西）',stop:'香港濕地公園，濕地公園路',accent:'var(--city)',url:'https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/002622/967',kind:'citybus'},
+  {key:'k76s',route:'K76S',destination:'天水圍站／天盛苑',stop:'濕地公園路（近天葵路）',accent:'var(--mtr)',url:'https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule',kind:'mtr'}
+ ]};
+ const state={items:{},updated:null};const board=document.querySelector('#board'),feed=document.querySelector('#feed'),button=document.querySelector('#refresh'),clock=document.querySelector('#clock');
+ const secText=s=>{if(s==null||!Number.isFinite(s))return '暫未有資料';if(s<=45)return '即將到站';return `${Math.max(1,Math.ceil(s/60))} 分鐘`};
+ const isoSecs=t=>{const n=Date.parse(t);return Number.isFinite(n)?Math.round((n-Date.now())/1000):null};
+ const two=n=>String(n).padStart(2,'0');const nowText=()=>{const d=new Date();return `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`};
+ function render(){clock.textContent=nowText();board.innerHTML=CONFIG.services.map(s=>{const item=state.items[s.key]||{...s,note:'讀取中…',etas:[]};const first=item.etas?.[0],second=item.etas?.[1];const status=item.error?'error':!first?'empty':'';const eta=item.error?item.error:secText(first?.seconds);const next=second?`下一班 <strong>${secText(second.seconds)}</strong>`:(item.note||'');return `<article class="row ${status}" style="--accent:${s.accent}"><div class="route">${s.route}</div><div class="destination">${s.destination}</div><div class="eta">${eta}</div><div class="next">${next}</div></article>`}).join('');}
+ async function loadRoad(s){try{const r=await fetch(s.url,{cache:'no-store'});if(!r.ok)throw Error(`HTTP ${r.status}`);const p=await r.json();const etas=(p.data||[]).filter(x=>x.dir==='O'&&x.eta).sort((a,b)=>a.eta_seq-b.eta_seq).slice(0,3).map(x=>({seconds:isoSecs(x.eta)}));state.items[s.key]={...s,etas,note:etas.length?'':'現時未有可用班次'};}catch(e){state.items[s.key]={...s,etas:[],error:`暫未能讀取 ${s.route} 資料`};}}
+ async function loadMtr(s){try{const r=await fetch(s.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:'zh',routeName:'K76S'})});if(!r.ok)throw Error(`HTTP ${r.status}`);const p=await r.json();const stop=(p.busStop||[]).find(x=>/濕地公園路|天葵路/.test(x.busStopRemark||'')||/濕地公園/.test(x.busStopId||''));const etas=(stop?.bus||[]).map(b=>({seconds:Number(b.departureTimeInSecond)})).filter(x=>Number.isFinite(x.seconds)&&x.seconds>=0).sort((a,b)=>a.seconds-b.seconds).slice(0,3);state.items[s.key]={...s,etas,note:etas.length?'':(p.routeStatusRemarkTitle||p.routeStatusRemarkContent||'現時未有到站資料')};}catch(e){state.items[s.key]={...s,etas:[],error:'暫未能讀取 K76S 資料'};}}
+ async function refresh(){button.disabled=true;button.textContent='更新中';await Promise.all(CONFIG.services.map(s=>s.kind==='mtr'?loadMtr(s):loadRoad(s)));state.updated=new Date();feed.innerHTML='<b>●</b> 已從官方資料來源更新 '+nowText();button.disabled=false;button.textContent='更新資料';render();}
+ setInterval(()=>{Object.values(state.items).forEach(i=>(i.etas||[]).forEach(x=>x.seconds--));render()},1000);button.addEventListener('click',refresh);render();refresh();setInterval(refresh,CONFIG.refreshMs);
+})();
+</script>
+</body>
+</html>
